@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="80" fill="#1565C0"/>
+  <!-- Medical cross -->
+  <rect x="192" y="80" width="128" height="352" rx="16" fill="#ffffff"/>
+  <rect x="80" y="192" width="352" height="128" rx="16" fill="#ffffff"/>
+</svg>
