@@ -94,15 +94,15 @@ export function AuthTemplate({ children }: Props) {
                     mb: 4,
                   }}
                 >
-                  Your trusted Point of Sale solution for Ugandan medical drug
-                  shops. Fast, compliant, and built for professionals.
+                  Your trusted Point of Sale solution for baby and kids
+                  garment shops. Fast, simple, and built for retail.
                 </Box>
 
                 {/* Feature highlights */}
                 <Box>
                   {[
-                    "✓ Uganda VAT & EFRIS compliant",
-                    "✓ FEFO batch-tracked inventory",
+                    "✓ Size & color SKU tracking",
+                    "✓ Automatic wholesale pricing",
                     "✓ Real-time analytics dashboard",
                     "✓ Works offline automatically",
                   ].map((feature) => (
