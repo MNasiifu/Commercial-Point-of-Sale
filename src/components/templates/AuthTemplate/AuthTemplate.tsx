@@ -104,7 +104,6 @@ export function AuthTemplate({ children }: Props) {
                     "✓ Size & color SKU tracking",
                     "✓ Automatic wholesale pricing",
                     "✓ Real-time analytics dashboard",
-                    "✓ Works offline automatically",
                   ].map((feature) => (
                     <Box
                       key={feature}
