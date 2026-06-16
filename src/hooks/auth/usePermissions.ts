@@ -17,6 +17,9 @@ export function usePermissions() {
     canManageUsers:     is('admin'),
     canManageProducts:  is('admin', 'manager'),
     canManageInventory: is('admin', 'manager'),
+    // Tellers may VIEW inventory (Overview + Product Stock only), read-only,
+    // scoped to their own branch. Mutations stay gated by canManageInventory.
+    canViewInventory:   is('admin', 'manager', 'teller'),
     canViewAllReports:  is('admin', 'manager'),
     canVoidSale:        is('admin', 'manager'),
     canProcessReturn:   is('admin', 'manager'),

@@ -41,6 +41,13 @@ const A4_STYLES = `
   td { padding: 5px 8px; font-size: 10px; border-bottom: 1px solid #eee; vertical-align: top; }
   tr:nth-child(even) td { background: #fafafa; }
   .num { text-align: right; font-family: monospace; }
+  /* Expanded per-row detail (e.g. transaction line items) */
+  td.detail-cell { padding: 0 8px 10px 24px; background: #f7fbff; border-bottom: 1px solid #e3f2fd; }
+  table.detail { width: auto; min-width: 60%; margin: 6px 0 2px; }
+  table.detail thead tr { background: #eef5fb; }
+  table.detail th { padding: 3px 8px; font-size: 9px; color: #37474f; border-bottom: 1px solid #cfd8dc; }
+  table.detail td { padding: 3px 8px; font-size: 9px; border-bottom: 1px solid #f0f0f0; background: transparent; }
+  .detail-empty { font-size: 9px; color: #888; padding: 4px 0; }
   .badge {
     display: inline-block;
     padding: 1px 6px;
@@ -78,12 +85,35 @@ export interface PdfColumn {
   render?: (value: unknown, row: Record<string, unknown>) => string;
 }
 
+/**
+ * Optional per-row detail rendered as an indented sub-table directly
+ * beneath each main row (mirrors the on-screen inline row expansion).
+ * `getRows` returns the detail records for a given main row.
+ */
+export interface PdfExpandable {
+  columns: PdfColumn[];
+  getRows: (row: Record<string, unknown>) => Record<string, unknown>[];
+  emptyText?: string;
+}
+
+function renderCells(columns: PdfColumn[], row: Record<string, unknown>): string {
+  return columns
+    .map((c) => {
+      const raw = row[c.key];
+      const value = c.render ? c.render(raw, row) : (raw ?? "—");
+      const align = c.align === "right" ? ' class="num"' : "";
+      return `<td${align}>${value}</td>`;
+    })
+    .join("");
+}
+
 export function printReport(opts: {
   title: string;
   meta?: Record<string, string>;
   summary?: Array<{ label: string; value: string }>;
   columns: PdfColumn[];
   rows: Record<string, unknown>[];
+  expandable?: PdfExpandable;
 }): void {
   const metaHtml = opts.meta
     ? Object.entries(opts.meta)
@@ -106,17 +136,27 @@ export function printReport(opts: {
     .map((c) => `<th style="text-align:${c.align ?? "left"}">${c.header}</th>`)
     .join("");
 
+  const exp = opts.expandable;
   const trs = opts.rows
     .map((row) => {
-      const tds = opts.columns
-        .map((c) => {
-          const raw = row[c.key];
-          const value = c.render ? c.render(raw, row) : (raw ?? "—");
-          const align = c.align === "right" ? ' class="num"' : "";
-          return `<td${align}>${value}</td>`;
-        })
-        .join("");
-      return `<tr>${tds}</tr>`;
+      const mainRow = `<tr>${renderCells(opts.columns, row)}</tr>`;
+      if (!exp) return mainRow;
+
+      const detailRows = exp.getRows(row);
+      let detailTable: string;
+      if (detailRows.length === 0) {
+        detailTable = `<div class="detail-empty">${exp.emptyText ?? "No items."}</div>`;
+      } else {
+        const dThs = exp.columns
+          .map((c) => `<th style="text-align:${c.align ?? "left"}">${c.header}</th>`)
+          .join("");
+        const dTrs = detailRows
+          .map((d) => `<tr>${renderCells(exp.columns, d)}</tr>`)
+          .join("");
+        detailTable = `<table class="detail"><thead><tr>${dThs}</tr></thead><tbody>${dTrs}</tbody></table>`;
+      }
+      const detailRow = `<tr><td class="detail-cell" colspan="${opts.columns.length}">${detailTable}</td></tr>`;
+      return mainRow + detailRow;
     })
     .join("");
 

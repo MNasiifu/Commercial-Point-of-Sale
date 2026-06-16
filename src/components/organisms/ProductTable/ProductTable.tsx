@@ -19,6 +19,7 @@ import FilterListIcon from "@mui/icons-material/FilterList";
 
 import { useProducts, useDeleteProduct } from "@/hooks/products/useProducts";
 import { useToggleProductActive } from "@/hooks/products/useProductMutations";
+import { usePermissions } from "@/hooks/auth/usePermissions";
 import { useCategories, useGarmentTypes } from "@/hooks/shared/useReferenceData";
 import { formatUGX } from "@/lib/formatters";
 import type { ProductWithDetails } from "@/services/productService";
@@ -34,13 +35,14 @@ type ModalState =
 
 interface RowActionsMenuProps {
   row: ProductWithDetails;
+  canManage: boolean;
   onViewDetails: (row: ProductWithDetails) => void;
   onEdit: (row: ProductWithDetails) => void;
   onToggleActive: (row: ProductWithDetails) => void;
   onDelete: (row: ProductWithDetails) => void;
 }
 
-function RowActionsMenu({ row, onViewDetails, onEdit, onToggleActive, onDelete }: RowActionsMenuProps) {
+function RowActionsMenu({ row, canManage, onViewDetails, onEdit, onToggleActive, onDelete }: RowActionsMenuProps) {
   const anchorRef = useRef<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -75,22 +77,24 @@ function RowActionsMenu({ row, onViewDetails, onEdit, onToggleActive, onDelete }
           <ListItemIcon sx={{ minWidth: 32 }}><VisibilityIcon fontSize="small" color="primary" /></ListItemIcon>
           <ListItemText primary="View Details" />
         </MenuItem>
-        <MenuItem onClick={handle(onEdit)}>
-          <ListItemIcon sx={{ minWidth: 32 }}><EditIcon fontSize="small" color="action" /></ListItemIcon>
-          <ListItemText primary="Edit" />
-        </MenuItem>
-        <MenuItem onClick={handle(onToggleActive)}>
-          <ListItemIcon sx={{ minWidth: 32 }}>
-            {row.is_active ? <ToggleOffIcon fontSize="small" color="warning" /> : <ToggleOnIcon fontSize="small" color="success" />}
-          </ListItemIcon>
-          <ListItemText primary={row.is_active ? "Deactivate" : "Activate"}
-            slotProps={{ primary: { sx: { color: row.is_active ? "warning.main" : "success.main", fontWeight: 500 } } }} />
-        </MenuItem>
-        <Divider sx={{ my: 0.5 }} />
-        <MenuItem onClick={handle(onDelete)}>
-          <ListItemIcon sx={{ minWidth: 32 }}><DeleteIcon fontSize="small" color="error" /></ListItemIcon>
-          <ListItemText primary="Delete" slotProps={{ primary: { sx: { color: "error.main", fontWeight: 500 } } }} />
-        </MenuItem>
+        {canManage && [
+          <MenuItem key="edit" onClick={handle(onEdit)}>
+            <ListItemIcon sx={{ minWidth: 32 }}><EditIcon fontSize="small" color="action" /></ListItemIcon>
+            <ListItemText primary="Edit" />
+          </MenuItem>,
+          <MenuItem key="toggle" onClick={handle(onToggleActive)}>
+            <ListItemIcon sx={{ minWidth: 32 }}>
+              {row.is_active ? <ToggleOffIcon fontSize="small" color="warning" /> : <ToggleOnIcon fontSize="small" color="success" />}
+            </ListItemIcon>
+            <ListItemText primary={row.is_active ? "Deactivate" : "Activate"}
+              slotProps={{ primary: { sx: { color: row.is_active ? "warning.main" : "success.main", fontWeight: 500 } } }} />
+          </MenuItem>,
+          <Divider key="divider" sx={{ my: 0.5 }} />,
+          <MenuItem key="delete" onClick={handle(onDelete)}>
+            <ListItemIcon sx={{ minWidth: 32 }}><DeleteIcon fontSize="small" color="error" /></ListItemIcon>
+            <ListItemText primary="Delete" slotProps={{ primary: { sx: { color: "error.main", fontWeight: 500 } } }} />
+          </MenuItem>,
+        ]}
       </Menu>
     </>
   );
@@ -100,6 +104,7 @@ const GENDER_LABEL: Record<string, string> = { boy: "Boy", girl: "Girl", unisex:
 
 export function ProductTable() {
   const navigate = useNavigate();
+  const { canManageProducts } = usePermissions();
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [garmentTypeId, setGarmentTypeId] = useState("");
@@ -171,6 +176,16 @@ export function ProductTable() {
         renderCell: ({ value }: GridRenderCellParams) =>
           value === "—" ? <Typography variant="caption" color="text.disabled">—</Typography>
             : <Chip label={value} size="small" variant="outlined" sx={{ borderRadius: "6px", fontSize: "0.75rem" }} />,
+      },
+      {
+        field: "store_location",
+        headerName: "Product location",
+        flex: 1,
+        minWidth: 130,
+        valueGetter: (_: unknown, row: ProductWithDetails) => row.store_location ?? "—",
+        renderCell: ({ value }: GridRenderCellParams) => (
+          <Typography variant="body2" color={value === "—" ? "text.disabled" : "text.primary"}>{value}</Typography>
+        ),
       },
       {
         field: "size",
@@ -245,19 +260,19 @@ export function ProductTable() {
         filterable: false,
         align: "center",
         renderCell: ({ row }: GridRenderCellParams<ProductWithDetails>) => (
-          <RowActionsMenu row={row} onViewDetails={handleViewDetails} onEdit={handleEdit}
+          <RowActionsMenu row={row} canManage={canManageProducts} onViewDetails={handleViewDetails} onEdit={handleEdit}
             onToggleActive={handleRequestToggle} onDelete={handleRequestDelete} />
         ),
       },
     ],
-    [handleViewDetails, handleEdit, handleRequestToggle, handleRequestDelete],
+    [canManageProducts, handleViewDetails, handleEdit, handleRequestToggle, handleRequestDelete],
   );
 
   return (
     <Box>
       <ResponsiveStack spacing={1.5} mb={2}>
         <SearchTextField
-          placeholder="Search by name or barcode…"
+          placeholder="Search by name, location or barcode…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           sx={{ ...responsiveWidth(), flex: 1, maxWidth: { sm: 380 } }}
@@ -266,10 +281,12 @@ export function ProductTable() {
           onClick={() => setShowFilters((v) => !v)} sx={{ ...responsiveWidth(), whiteSpace: "nowrap", flexShrink: 0 }}>
           Filters
         </Button>
-        <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => navigate("/products/new")}
-          sx={{ ...responsiveWidth(), whiteSpace: "nowrap", flexShrink: 0 }}>
-          Add Product
-        </Button>
+        {canManageProducts && (
+          <Button variant="contained" size="small" startIcon={<AddIcon />} onClick={() => navigate("/products/new")}
+            sx={{ ...responsiveWidth(), whiteSpace: "nowrap", flexShrink: 0 }}>
+            Add Product
+          </Button>
+        )}
       </ResponsiveStack>
 
       {showFilters && (

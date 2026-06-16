@@ -8,17 +8,17 @@ export interface ExcelCol {
   bold?: boolean;
 }
 
-export async function downloadExcel(
-  sheetName: string,
-  columns: ExcelCol[],
-  rows: Record<string, unknown>[],
-  filename: string,
-  headerMeta?: Record<string, string>,
-): Promise<void> {
-  const wb = new ExcelJS.Workbook();
-  wb.creator = "DAS POS";
-  wb.created = new Date();
+/** An additional worksheet appended after the primary sheet. */
+export interface ExcelSheet {
+  sheetName: string;
+  columns: ExcelCol[];
+  rows: Record<string, unknown>[];
+  headerMeta?: Record<string, string>;
+}
 
+/** Build a single worksheet (metadata rows, styled header, data, auto-filter). */
+function buildSheet(wb: ExcelJS.Workbook, sheet: ExcelSheet): void {
+  const { sheetName, columns, rows, headerMeta } = sheet;
   const ws = wb.addWorksheet(sheetName);
 
   // Optional report metadata rows at the top
@@ -60,6 +60,22 @@ export async function downloadExcel(
     from: { row: headerRowNum, column: 1 },
     to: { row: headerRowNum, column: columns.length },
   };
+}
+
+export async function downloadExcel(
+  sheetName: string,
+  columns: ExcelCol[],
+  rows: Record<string, unknown>[],
+  filename: string,
+  headerMeta?: Record<string, string>,
+  extraSheets?: ExcelSheet[],
+): Promise<void> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "DAS POS";
+  wb.created = new Date();
+
+  buildSheet(wb, { sheetName, columns, rows, headerMeta });
+  extraSheets?.forEach((s) => buildSheet(wb, s));
 
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], {

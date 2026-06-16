@@ -10,11 +10,15 @@ import { BranchSelect } from "@/components/molecules/BranchSelect/BranchSelect";
 import { useProductStock } from "@/hooks/inventory/useInventory";
 import { useCategories } from "@/hooks/shared/useReferenceData";
 import { useAuth } from "@/hooks/auth/useAuth";
+import { usePermissions } from "@/hooks/auth/usePermissions";
 import { formatUGX } from "@/lib/formatters";
 import { LOW_STOCK_THRESHOLD, type ProductStockRow } from "@/services/inventoryService";
 
 export function ProductStockTable() {
   const { role } = useAuth();
+  // Cost price, margin and stock value are finance-sensitive — tellers get a
+  // read-only view limited to product, category, on-hand and retail price.
+  const { canManageInventory } = usePermissions();
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [lowStockOnly, setLowStockOnly] = useState(false);
@@ -82,18 +86,22 @@ export function ProductStockTable() {
           );
         },
       },
-      {
-        field: "cost_price",
-        headerName: "Cost price",
-        width: 190,
-        align: "right",
-        headerAlign: "right",
-        renderCell: ({ row }: GridRenderCellParams<ProductStockRow>) => (
-          <Typography variant="body2" fontFamily="monospace" color="text.secondary">
-            {formatUGX(row.cost_price)}
-          </Typography>
-        ),
-      },
+      ...(canManageInventory
+        ? [
+            {
+              field: "cost_price",
+              headerName: "Cost price",
+              width: 190,
+              align: "right" as const,
+              headerAlign: "right" as const,
+              renderCell: ({ row }: GridRenderCellParams<ProductStockRow>) => (
+                <Typography variant="body2" fontFamily="monospace" color="text.secondary">
+                  {formatUGX(row.cost_price)}
+                </Typography>
+              ),
+            },
+          ]
+        : []),
       {
         field: "retail_price",
         headerName: "Retail price",
@@ -106,41 +114,45 @@ export function ProductStockTable() {
           </Typography>
         ),
       },
-      {
-        field: "margin",
-        headerName: "Margin",
-        width: 190,
-        align: "right",
-        headerAlign: "right",
-        valueGetter: (_: unknown, row: ProductStockRow) => row.retail_price - row.cost_price,
-        renderCell: ({ row }: GridRenderCellParams<ProductStockRow>) => {
-          const margin = row.retail_price - row.cost_price;
-          return (
-            <Typography
-              variant="body2"
-              fontFamily="monospace"
-              color={margin > 0 ? "success.main" : margin < 0 ? "error.main" : "text.secondary"}
-            >
-              {formatUGX(margin)}
-            </Typography>
-          );
-        },
-      },
-      {
-        field: "stock_value",
-        headerName: "Stock value",
-        width: 190,
-        align: "right",
-        headerAlign: "right",
-        valueGetter: (_: unknown, row: ProductStockRow) => row.quantity * row.cost_price,
-        renderCell: ({ row }: GridRenderCellParams<ProductStockRow>) => (
-          <Typography variant="body2" fontFamily="monospace" color="text.secondary">
-            {formatUGX(row.quantity * row.cost_price)}
-          </Typography>
-        ),
-      },
+      ...(canManageInventory
+        ? [
+            {
+              field: "margin",
+              headerName: "Margin",
+              width: 190,
+              align: "right" as const,
+              headerAlign: "right" as const,
+              valueGetter: (_: unknown, row: ProductStockRow) => row.retail_price - row.cost_price,
+              renderCell: ({ row }: GridRenderCellParams<ProductStockRow>) => {
+                const margin = row.retail_price - row.cost_price;
+                return (
+                  <Typography
+                    variant="body2"
+                    fontFamily="monospace"
+                    color={margin > 0 ? "success.main" : margin < 0 ? "error.main" : "text.secondary"}
+                  >
+                    {formatUGX(margin)}
+                  </Typography>
+                );
+              },
+            },
+            {
+              field: "stock_value",
+              headerName: "Stock value",
+              width: 190,
+              align: "right" as const,
+              headerAlign: "right" as const,
+              valueGetter: (_: unknown, row: ProductStockRow) => row.quantity * row.cost_price,
+              renderCell: ({ row }: GridRenderCellParams<ProductStockRow>) => (
+                <Typography variant="body2" fontFamily="monospace" color="text.secondary">
+                  {formatUGX(row.quantity * row.cost_price)}
+                </Typography>
+              ),
+            },
+          ]
+        : []),
     ],
-    [],
+    [canManageInventory],
   );
 
   return (

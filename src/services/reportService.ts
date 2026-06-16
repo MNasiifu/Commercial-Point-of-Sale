@@ -1,10 +1,19 @@
 import { supabase } from '@/lib/supabase'
-import type { SaleType, StockTransferStatus } from '@/types/database.types'
+import type { PriceTier, SaleType, StockTransferStatus } from '@/types/database.types'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any
 
 // ─── Row types ────────────────────────────────────────────────────────────────
+
+/** One product line within a transaction, embedded by get_sales_report. */
+export interface SalesReportItem {
+  product_name: string
+  quantity:     number
+  unit_price:   number
+  price_tier:   PriceTier
+  amount:       number
+}
 
 export interface SalesReportRow {
   sale_number:     string
@@ -18,6 +27,7 @@ export interface SalesReportRow {
   total_amount:    number
   payment_methods: string
   is_voided:       boolean
+  items:           SalesReportItem[]
 }
 
 export interface GoodsReceivedRow {

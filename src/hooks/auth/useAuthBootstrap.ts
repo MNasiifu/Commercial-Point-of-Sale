@@ -23,21 +23,8 @@ import { useEffect }    from 'react'
 import { supabase }     from '@/lib/supabase'
 import { queryClient }  from '@/lib/queryClient'
 import { useAuthStore } from '@/store/authStore'
-import type { Profile } from '@/types/database.types'
-
-async function fetchProfile(userId: string): Promise<Profile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .is('deleted_at', null)
-    .single()
-  if (error) {
-    console.error('[Auth] fetchProfile error:', error.message)
-    return null
-  }
-  return data
-}
+import { branchStorage } from '@/store/localStorage'
+import { fetchProfile, fetchBranchDetails } from '@/services/authService'
 
 export function useAuthBootstrap() {
   const { setSession, setProfile, setLoading, setInitialized, clearAuth } =
@@ -61,6 +48,16 @@ export function useAuthBootstrap() {
         if (session && mounted) {
           const p = await fetchProfile(session.user.id)
           if (!mounted) return
+
+          // Re-fetch the branch on every restore so a reassigned user always
+          // sees their current store — never the stale localStorage copy.
+          // Persist BEFORE setProfile so the re-render reads the fresh value.
+          if (p?.branch_id) {
+            const branch = await fetchBranchDetails(p.branch_id)
+            if (!mounted) return
+            if (branch) branchStorage.set(branch)
+          }
+
           setSession(session, session.user)
           setProfile(p)
         }

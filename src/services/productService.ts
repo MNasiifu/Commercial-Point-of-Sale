@@ -46,32 +46,23 @@ export interface ProductFilters {
 export const productService = {
 
   async getAll(filters: ProductFilters = {}): Promise<ProductWithDetails[]> {
-    let query = db
-      .from('products')
-      .select(PRODUCT_SELECT)
-      .is('deleted_at', null)
-      .order('name')
-
-    if (filters.showInactive === false) query = query.eq('is_active', true)
-    if (filters.categoryId)    query = query.eq('category_id', filters.categoryId)
-    if (filters.brandId)       query = query.eq('brand_id', filters.brandId)
-    if (filters.garmentTypeId) query = query.eq('garment_type_id', filters.garmentTypeId)
-    if (filters.sizeId)        query = query.eq('size_id', filters.sizeId)
-    if (filters.colorId)       query = query.eq('color_id', filters.colorId)
-    if (filters.gender)        query = query.eq('gender', filters.gender)
-
-    const { data, error } = await query
+    // List + search are resolved entirely in the DB via the search_products
+    // RPC (migration 020). It returns rows already shaped like
+    // ProductWithDetails (nested relations + barcodes), case-insensitive
+    // substring search across name / store_location / barcode / category /
+    // brand / garment-type names.
+    const { data, error } = await db.rpc('search_products', {
+      p_search:          filters.search ?? null,
+      p_category_id:     filters.categoryId ?? null,
+      p_brand_id:        filters.brandId ?? null,
+      p_garment_type_id: filters.garmentTypeId ?? null,
+      p_size_id:         filters.sizeId ?? null,
+      p_color_id:        filters.colorId ?? null,
+      p_gender:          filters.gender ?? null,
+      p_show_inactive:   filters.showInactive ?? null,
+    })
     if (error) throw error
-
-    if (filters.search) {
-      const q = filters.search.toLowerCase()
-      return (data as ProductWithDetails[]).filter(
-        (p) =>
-          p.name.toLowerCase().includes(q) ||
-          p.product_barcodes.some((b) => b.barcode.includes(q))
-      )
-    }
-    return data as ProductWithDetails[]
+    return (data ?? []) as ProductWithDetails[]
   },
 
   async getById(id: string): Promise<ProductWithDetails> {

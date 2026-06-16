@@ -9,6 +9,7 @@ import SellIcon from "@mui/icons-material/Sell";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
+import StorefrontIcon from "@mui/icons-material/Storefront";
 import { BarChart } from "@mui/x-charts/BarChart";
 import { PieChart } from "@mui/x-charts/PieChart";
 
@@ -30,13 +31,25 @@ const PAYMENT_COLORS: Record<string, string> = {
 
 export function DashboardPage() {
   const { hasFullDashboard, hasTellerDashboard } = usePermissions();
-  const { fullName } = useAuth();
+  const { fullName, branchDetails } = useAuth();
   const today = formatDate(new Date().toISOString());
 
   return (
     <DashboardTemplate>
       <Box mb={3}>
-        <Typography variant="h5" fontWeight={700}>Welcome back, {fullName}</Typography>
+        <Box display="flex" alignItems="center" gap={1.5} flexWrap="wrap">
+          <Typography variant="h5" fontWeight={700}>Welcome back, {fullName}</Typography>
+          {branchDetails && (
+            <Chip
+              icon={<StorefrontIcon />}
+              label={branchDetails.name}
+              color="primary"
+              size="small"
+              variant="outlined"
+              sx={{ fontWeight: 600, borderRadius: "6px" }}
+            />
+          )}
+        </Box>
         <Typography variant="body2" color="text.secondary">
           {today} ·{" "}
           {hasTellerDashboard && !hasFullDashboard

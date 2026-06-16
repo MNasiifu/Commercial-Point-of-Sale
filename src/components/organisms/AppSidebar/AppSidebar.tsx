@@ -46,6 +46,7 @@ import MenuIcon from "@mui/icons-material/Menu";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import LogoutIcon from "@mui/icons-material/Logout";
+import StorefrontIcon from "@mui/icons-material/Storefront";
 
 import { Logo } from "@/components/atoms/Logo/Logo";
 import { StatusDot } from "@/components/atoms/StatusDot/StatusDot";
@@ -86,28 +87,31 @@ const NAV: NavItem[] = [
     label: "Products",
     path: "/products",
     icon: <CheckroomIcon />,
-    roles: ["admin", "manager"],
+    roles: ["admin", "manager", "teller"],
   },
   {
     id: "inventory",
     label: "Inventory",
     path: "/inventory",
     icon: <WarehouseIcon />,
-    roles: ["admin", "manager"],
+    // Teller is allowed on the group so the two read-only children below
+    // (Overview, Product Stock) can render. The mutating children stay
+    // admin/manager-only and are filtered out per-item for tellers.
+    roles: ["admin", "manager", "teller"],
     children: [
        {
         id: "inv-overview",
         label: "Overview",
         path: "/inventory/overview",
         icon: <GridViewIcon />,
-        roles: ["admin", "manager"],
+        roles: ["admin", "manager", "teller"],
       },
       {
         id: "inv-product-stock",
         label: "Product Stock",
         path: "/inventory/product-stock",
         icon: <AssignmentIcon />,
-        roles: ["admin", "manager"],
+        roles: ["admin", "manager", "teller"],
       },
       {
         id: "inv-transfers",
@@ -288,7 +292,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const { role } = usePermissions();
-  const { signOut, fullName, profile } = useAuth();
+  const { signOut, fullName, profile, branchDetails } = useAuth();
 
   const width = isMobile ? EXPANDED : collapsed ? COLLAPSED : EXPANDED;
 
@@ -472,6 +476,21 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
               >
                 {profile?.role}
               </Typography>
+
+              {branchDetails && (
+                <Box
+                  display="flex"
+                  alignItems="center"
+                  gap={0.5}
+                  mt={0.25}
+                  color="primary.main"
+                >
+                  <StorefrontIcon sx={{ fontSize: 14 }} />
+                  <Typography variant="caption" fontWeight={600} noWrap>
+                    {branchDetails.name}
+                  </Typography>
+                </Box>
+              )}
             </Box>
           )}
 

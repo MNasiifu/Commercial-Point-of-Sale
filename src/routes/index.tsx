@@ -309,26 +309,13 @@ export const router = createBrowserRouter([
               </S>
             ),
           },
-        ],
-      },
-
-      // Admin + Manager only
-      {
-        element: <RoleRoute allowedRoles={["admin", "manager"]} />,
-        children: [
+          // Products — list + detail are read-only and open to all roles.
+          // Creating/editing products is gated to admin + manager below.
           {
             path: "/products",
             element: (
               <S>
                 <ProductsPage />
-              </S>
-            ),
-          },
-          {
-            path: "/products/new",
-            element: (
-              <S>
-                <ProductFormPage />
               </S>
             ),
           },
@@ -340,14 +327,9 @@ export const router = createBrowserRouter([
               </S>
             ),
           },
-          {
-            path: "/products/:id/edit",
-            element: (
-              <S>
-                <ProductFormPage />
-              </S>
-            ),
-          },
+          // Inventory — read-only views open to all roles. Tellers see a
+          // trimmed Overview and a cost-free Product Stock table, scoped to
+          // their own branch. Mutating inventory pages stay admin/manager-only.
           {
             path: "/inventory",
             element: (
@@ -365,6 +347,37 @@ export const router = createBrowserRouter([
             ),
           },
           {
+            path: "/inventory/product-stock",
+            element: (
+              <S>
+                <ProductStockPage />
+              </S>
+            ),
+          },
+        ],
+      },
+
+      // Admin + Manager only
+      {
+        element: <RoleRoute allowedRoles={["admin", "manager"]} />,
+        children: [
+          {
+            path: "/products/new",
+            element: (
+              <S>
+                <ProductFormPage />
+              </S>
+            ),
+          },
+          {
+            path: "/products/:id/edit",
+            element: (
+              <S>
+                <ProductFormPage />
+              </S>
+            ),
+          },
+          {
             path: "/inventory/transfers",
             element: (
               <S>
@@ -377,14 +390,6 @@ export const router = createBrowserRouter([
             element: (
               <S>
                 <TransferDetailPage />
-              </S>
-            ),
-          },
-          {
-            path: "/inventory/product-stock",
-            element: (
-              <S>
-                <ProductStockPage />
               </S>
             ),
           },

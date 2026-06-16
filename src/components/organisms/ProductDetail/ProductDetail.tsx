@@ -22,6 +22,7 @@ import DescriptionIcon from '@mui/icons-material/Description'
 import QrCodeIcon      from '@mui/icons-material/QrCode'
 
 import { useProductDetail } from '@/hooks/products/useProductDetail'
+import { usePermissions } from '@/hooks/auth/usePermissions'
 import { DeleteProductModal } from '@/components/organisms/ProductTable/DeleteProductModal'
 import { ToggleProductModal } from '@/components/organisms/ProductTable/ToggleProductModal'
 import { formatUGX, formatDateTime } from '@/lib/formatters'
@@ -68,6 +69,7 @@ export function ProductDetail() {
     goBack, goEdit, handleRequestToggle, handleRequestDelete,
     handleClose, handleConfirmDelete, handleConfirmToggle,
   } = useProductDetail()
+  const { canManageProducts } = usePermissions()
 
   if (isLoading) {
     return <Box display="flex" justifyContent="center" alignItems="center" py={10}><CircularProgress /></Box>
@@ -107,16 +109,18 @@ export function ProductDetail() {
             {[product.brands?.name, product.sizes?.name, color?.name].filter(Boolean).join(' · ') || '—'}
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1} flexShrink={0}>
-          <Button variant="contained" size="small" startIcon={<EditIcon />} onClick={goEdit}>Edit</Button>
-          <Button variant="outlined" size="small" color={product.is_active ? 'warning' : 'success'}
-            startIcon={product.is_active ? <ToggleOffIcon /> : <ToggleOnIcon />}
-            onClick={() => handleRequestToggle(product)}>
-            {product.is_active ? 'Deactivate' : 'Activate'}
-          </Button>
-          <Button variant="outlined" size="small" color="error" startIcon={<DeleteIcon />}
-            onClick={() => handleRequestDelete(product)}>Delete</Button>
-        </Stack>
+        {canManageProducts && (
+          <Stack direction="row" spacing={1} flexShrink={0}>
+            <Button variant="contained" size="small" startIcon={<EditIcon />} onClick={goEdit}>Edit</Button>
+            <Button variant="outlined" size="small" color={product.is_active ? 'warning' : 'success'}
+              startIcon={product.is_active ? <ToggleOffIcon /> : <ToggleOnIcon />}
+              onClick={() => handleRequestToggle(product)}>
+              {product.is_active ? 'Deactivate' : 'Activate'}
+            </Button>
+            <Button variant="outlined" size="small" color="error" startIcon={<DeleteIcon />}
+              onClick={() => handleRequestDelete(product)}>Delete</Button>
+          </Stack>
+        )}
       </Box>
 
       <Grid container spacing={2.5}>

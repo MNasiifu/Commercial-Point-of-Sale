@@ -1,9 +1,10 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Alert, Box, Button, Chip, CircularProgress, FormControl, IconButton,
-  InputLabel, MenuItem, Paper, Select, Stack, TextField, Tooltip, Typography,
+  InputLabel, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell,
+  TableHead, TableRow, TextField, Tooltip, Typography,
 } from "@mui/material";
 import { type GridColDef, type GridRenderCellParams } from "@mui/x-data-grid";
 import { AppDataGrid } from "@/components/molecules/AppDataGrid";
@@ -12,6 +13,8 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import TableChartIcon from "@mui/icons-material/TableChart";
 import PrintIcon from "@mui/icons-material/Print";
+import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 
 import { DashboardTemplate } from "@/components/templates/DashboardTemplate/DashboardTemplate";
 import { useSalesReport, useTellers } from "@/hooks/reports/useReports";
@@ -20,14 +23,68 @@ import { useAuth } from "@/hooks/auth/useAuth";
 import { downloadExcel } from "@/lib/reports/exportExcel";
 import { printReport } from "@/lib/reports/exportPdf";
 import { formatUGX, formatDateTime, formatDateInput, formatPaymentMethod } from "@/lib/formatters";
-import type { SalesReportRow, SalesReportFilters } from "@/services/reportService";
-import type { SaleType } from "@/types/database.types";
+import type { SalesReportRow, SalesReportItem, SalesReportFilters } from "@/services/reportService";
+import type { PriceTier, SaleType } from "@/types/database.types";
 
 const SALE_TYPE_LABELS: Record<SaleType, string> = {
   walk_in: "Walk-in",
   account: "Account",
   delivery: "Delivery",
 };
+
+const PRICE_TIER_LABELS: Record<PriceTier, string> = {
+  retail: "Retail",
+  wholesale: "Wholesale",
+};
+
+/** A grid row is either a real sale or a synthetic detail row carrying the same data. */
+type GridRow = SalesReportRow & { __detail?: boolean };
+
+/** Total grid columns (expand toggle + 8 data columns) — used for the detail row colSpan. */
+const COLUMN_COUNT = 9;
+
+/** Inline products sub-table rendered beneath an expanded transaction row. */
+function ExpandedItems({ row }: { row: SalesReportRow }) {
+  const items = row.items ?? [];
+  return (
+    <Box sx={{ width: "100%", py: 1.25, pl: 6, pr: 2, bgcolor: "action.hover" }}>
+      <Typography variant="caption" color="text.secondary"
+        sx={{ textTransform: "uppercase", letterSpacing: 0.6, fontWeight: 700, fontSize: "0.65rem" }}>
+        Products — {row.sale_number}
+      </Typography>
+      {items.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>No items recorded.</Typography>
+      ) : (
+        <Table size="small" sx={{ mt: 0.5, maxWidth: 720, "& td, & th": { border: 0, py: 0.5 } }}>
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 700, fontSize: "0.7rem" }}>Product</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 700, fontSize: "0.7rem" }}>Qty</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 700, fontSize: "0.7rem" }}>Unit price</TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: "0.7rem" }}>Tier</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 700, fontSize: "0.7rem" }}>Amount</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {items.map((it, i) => (
+              <TableRow key={`${it.product_name}-${i}`}>
+                <TableCell sx={{ fontSize: "0.75rem" }}>{it.product_name}</TableCell>
+                <TableCell align="right" sx={{ fontSize: "0.75rem", fontFamily: "monospace" }}>{it.quantity}</TableCell>
+                <TableCell align="right" sx={{ fontSize: "0.75rem", fontFamily: "monospace" }}>{formatUGX(it.unit_price)}</TableCell>
+                <TableCell sx={{ fontSize: "0.75rem" }}>
+                  {it.price_tier === "wholesale"
+                    ? <Chip label="Wholesale" size="small" color="success" variant="outlined" sx={{ borderRadius: "6px", fontSize: "0.6rem", height: 18 }} />
+                    : <Typography variant="caption" color="text.secondary">Retail</Typography>}
+                </TableCell>
+                <TableCell align="right" sx={{ fontSize: "0.75rem", fontFamily: "monospace", fontWeight: 700 }}>{formatUGX(it.amount)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </Box>
+  );
+}
 
 function monthStart() {
   const d = new Date();
@@ -80,8 +137,18 @@ export function SalesReportPage() {
     categoryId: null,
   });
   const [enabled, setEnabled] = useState(false);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const { data: rows = [], isLoading, isError, refetch } = useSalesReport(filters, enabled);
+
+  const toggleExpand = useCallback((saleNumber: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(saleNumber)) next.delete(saleNumber);
+      else next.add(saleNumber);
+      return next;
+    });
+  }, []);
   const { data: tellers = [] } = useTellers();
   const { data: categories = [] } = useCategories();
 
@@ -96,8 +163,31 @@ export function SalesReportPage() {
 
   const handleRun = () => { if (enabled) refetch(); else setEnabled(true); };
 
-  const columns: GridColDef<SalesReportRow>[] = useMemo(
+  const columns: GridColDef<GridRow>[] = useMemo(
     () => [
+      {
+        field: "__expand",
+        headerName: "",
+        width: 48,
+        sortable: false,
+        filterable: false,
+        disableColumnMenu: true,
+        // A detail row spans the entire grid width to host the products sub-table.
+        colSpan: (_value, row) => (row.__detail ? COLUMN_COUNT : 1),
+        renderCell: (params: GridRenderCellParams<GridRow>) => {
+          if (params.row.__detail) return <ExpandedItems row={params.row} />;
+          const open = expanded.has(params.row.sale_number);
+          return (
+            <IconButton
+              size="small"
+              aria-label={open ? "Collapse products" : "Expand products"}
+              onClick={(e) => { e.stopPropagation(); toggleExpand(params.row.sale_number); }}
+            >
+              {open ? <KeyboardArrowDownIcon fontSize="small" /> : <KeyboardArrowRightIcon fontSize="small" />}
+            </IconButton>
+          );
+        },
+      },
       { field: "sale_date", headerName: "Date", width: 160, flex: 1, valueFormatter: (v: string) => formatDateTime(v) },
       { field: "branch_name", headerName: "Branch", width: 130 },
       { field: "teller_name", headerName: "Teller", flex: 1, minWidth: 120 },
@@ -141,8 +231,22 @@ export function SalesReportPage() {
         ),
       },
     ],
-    [],
+    [expanded, toggleExpand],
   );
+
+  // Flatten sales into grid rows, injecting a synthetic detail row after each
+  // expanded sale. The free Community DataGrid has no native master-detail, so
+  // the detail row spans all columns (via colSpan) to host the products table.
+  // Caveat: detail rows count toward pagination and follow their parent under
+  // sorting (stable insertion order), which is acceptable for this report.
+  const gridRows: GridRow[] = useMemo(() => {
+    const out: GridRow[] = [];
+    for (const r of rows) {
+      out.push(r);
+      if (expanded.has(r.sale_number)) out.push({ ...r, __detail: true });
+    }
+    return out;
+  }, [rows, expanded]);
 
   const totalRevenue = rows.filter((r) => !r.is_voided).reduce((s, r) => s + r.total_amount, 0);
   const wholesaleCount = rows.filter((r) => !r.is_voided && r.has_wholesale).length;
@@ -171,6 +275,34 @@ export function SalesReportPage() {
         ...(activeCategoryName ? { Category: activeCategoryName } : {}),
         Generated: new Date().toLocaleString("en-UG"),
       },
+      // Second sheet: one row per product line, joinable to the Sales sheet by Sale #.
+      [
+        {
+          sheetName: "Line Items",
+          columns: [
+            { header: "Sale #", key: "sale_number", width: 20 },
+            { header: "Date", key: "sale_date", width: 22 },
+            { header: "Branch", key: "branch_name", width: 16 },
+            { header: "Product", key: "product_name", width: 30 },
+            { header: "Qty", key: "quantity", width: 8, numFmt: "#,##0" },
+            { header: "Unit Price", key: "unit_price", width: 14, numFmt: "#,##0" },
+            { header: "Tier", key: "price_tier", width: 12 },
+            { header: "Amount", key: "amount", width: 16, numFmt: "#,##0" },
+          ],
+          rows: rows.flatMap((r) =>
+            r.items.map((it) => ({
+              sale_number:  r.sale_number,
+              sale_date:    formatDateTime(r.sale_date),
+              branch_name:  r.branch_name,
+              product_name: it.product_name,
+              quantity:     it.quantity,
+              unit_price:   it.unit_price,
+              price_tier:   PRICE_TIER_LABELS[it.price_tier] ?? it.price_tier,
+              amount:       it.amount,
+            })),
+          ),
+        },
+      ],
     );
   };
 
@@ -200,6 +332,18 @@ export function SalesReportPage() {
         { header: "Voided", key: "is_voided", render: (v) => (v ? '<span class="badge badge-red">Yes</span>' : "No") },
       ],
       rows: rows as unknown as Record<string, unknown>[],
+      // Per-transaction products rendered as an indented sub-table under each row.
+      expandable: {
+        columns: [
+          { header: "Product", key: "product_name" },
+          { header: "Qty", key: "quantity", align: "right" },
+          { header: "Unit price", key: "unit_price", align: "right", render: (v) => formatUGX(v as number) },
+          { header: "Tier", key: "price_tier", render: (v) => PRICE_TIER_LABELS[v as PriceTier] ?? String(v) },
+          { header: "Amount", key: "amount", align: "right", render: (v) => formatUGX(v as number) },
+        ],
+        getRows: (row) => (row.items as SalesReportItem[] | undefined ?? []) as unknown as Record<string, unknown>[],
+        emptyText: "No items recorded.",
+      },
     });
   };
 
@@ -305,9 +449,10 @@ export function SalesReportPage() {
 
       {enabled && (
         <AppDataGrid
-          rows={rows}
+          rows={gridRows}
           columns={columns}
-          getRowId={(r) => r.sale_number}
+          getRowId={(r) => (r.__detail ? `${r.sale_number}::items` : r.sale_number)}
+          getRowHeight={(params) => (params.model.__detail ? "auto" : null)}
           loading={isLoading}
           density="compact"
           pageSizeOptions={[50, 100, 200]}

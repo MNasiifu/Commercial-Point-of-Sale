@@ -13,6 +13,7 @@ import MenuIcon from "@mui/icons-material/Menu";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
+import StorefrontIcon from "@mui/icons-material/Storefront";
 import { useThemeStore } from "@/store/themeStore";
 import { useAuth } from "@/hooks/auth/useAuth";
 import { useLocation } from "react-router-dom";
@@ -62,7 +63,7 @@ export function AppHeader({ onMenuClick, sidebarWidth }: Props) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const { mode, toggleMode } = useThemeStore();
-  const { role } = useAuth();
+  const { role, branchDetails } = useAuth();
   const { pathname } = useLocation();
 
   const pageTitle = PAGE_TITLES[pathname] ?? "DAS POS";
@@ -102,6 +103,21 @@ export function AppHeader({ onMenuClick, sidebarWidth }: Props) {
         <Box display="flex" alignItems="center" gap={1}>
           {/* PWA install button — only visible when browser supports A2HS */}
           <InstallPrompt />
+
+          {/* Store chip — the branch the signed-in user is attached to.
+              Hidden on mobile, where the sidebar footer shows it instead. */}
+          {!isMobile && branchDetails && (
+            <Tooltip title="Your store" arrow>
+              <Chip
+                icon={<StorefrontIcon />}
+                label={branchDetails.name}
+                color="primary"
+                size="small"
+                variant="outlined"
+                sx={{ fontWeight: 600, borderRadius: "6px" }}
+              />
+            </Tooltip>
+          )}
 
           {/* Role chip */}
           {role && (
